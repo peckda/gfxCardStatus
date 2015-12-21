@@ -99,6 +99,29 @@
     // Check for updates if the user has them enabled.
     if ([_prefs shouldCheckForUpdatesOnStartup])
         [updater checkForUpdatesInBackground];
+    
+    double delayInSeconds = 1;
+    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+    dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+        [self setModeToSavedMode];
+    });
+}
+
+- (void) setModeToSavedMode
+{
+    int savedMode = self.savedMode;
+    if (savedMode > 0) {
+        GTMLoggerDebug(@"Restoring saved mode %d", savedMode);
+        [self.menuController setModeInt:savedMode];
+    } else {
+        GTMLoggerDebug(@"No mode saved");
+    }
+}
+
+- (int) savedMode
+{
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    return [ud integerForKey:@"selected-mode"];
 }
 
 #pragma mark - Termination Notifications
@@ -126,6 +149,12 @@
 
 - (void)GPUDidChangeTo:(GSGPUType)gpu
 {
+    int savedMode = self.savedMode;
+    if (((savedMode == MODE_INTEGRATED_ONLY) && (gpu != GSGPUTypeIntegrated)) ||
+        ((savedMode == MODE_DISCRETE_ONLY) && (gpu != GSGPUTypeDiscrete))) {
+        GTMLoggerDebug(@"GPU changed to something that I don't want, attempting reset...");
+        [self setModeToSavedMode];
+    }
     [menuController updateMenu];
     [GSNotifier showGPUChangeNotification:gpu];
 }

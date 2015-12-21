@@ -180,54 +180,83 @@
     [[NSApplication sharedApplication] terminate:self];
 }
 
-- (IBAction)setMode:(id)sender
+- (void)setModeInt:(int)selectedMode
 {
+    
     // For legacy machines.
-    if (sender == switchGPUs) {
+    if (selectedMode == MODE_SWITCH) {
         GTMLoggerInfo(@"Switching GPUs...");
         [GSMux setMode:GSSwitcherModeToggleGPU];
         return;
     }
-
-    // Don't go any further if the user clicked on an already-selected item.
-    if ([sender state] == NSOnState) return;
-
+    
+    
     BOOL retval = NO;
-
-    if (sender == integratedOnly) {
+    int modeToSet = -1;
+    if (selectedMode == MODE_INTEGRATED_ONLY) {
+        modeToSet = MODE_INTEGRATED_ONLY;
         NSArray *taskList = [GSProcess getTaskList];
         if (taskList.count > 0) {
             GTMLoggerInfo(@"Not setting Integrated Only because of dependencies list items: %@", taskList);
-
+            
             NSMutableArray *taskNames = [[NSMutableArray alloc] init];
             for (NSDictionary *dict in taskList) {
                 NSString *taskName = [dict objectForKey:kTaskItemName];
                 [taskNames addObject:taskName];
             }
-
+            
             [GSNotifier showCantSwitchToIntegratedOnlyMessage:taskNames];
             return;
         }
-
+        
         GTMLoggerInfo(@"Setting Integrated Only...");
         retval = [GSMux setMode:GSSwitcherModeForceIntegrated];
     }
-
-    if (sender == discreteOnly) { 
+    
+    if (selectedMode == MODE_DISCRETE_ONLY) {
+        modeToSet = MODE_DISCRETE_ONLY;
         GTMLoggerInfo(@"Setting Discrete Only...");
         retval = [GSMux setMode:GSSwitcherModeForceDiscrete];
     }
-
-    if (sender == dynamicSwitching) {
+    
+    if (selectedMode == MODE_DYNAMIC) {
+        modeToSet = MODE_DYNAMIC;
         GTMLoggerInfo(@"Setting Dynamic Switching...");
         retval = [GSMux setMode:GSSwitcherModeDynamicSwitching];
     }
-
+    
     // Only change status in case of GPU switch success.
     if (retval) {
-        [integratedOnly setState:(sender == integratedOnly ? NSOnState : NSOffState)];
-        [discreteOnly setState:(sender == discreteOnly ? NSOnState : NSOffState)];
-        [dynamicSwitching setState:(sender == dynamicSwitching ? NSOnState : NSOffState)];
+        [integratedOnly setState:(modeToSet == MODE_INTEGRATED_ONLY ? NSOnState : NSOffState)];
+        [discreteOnly setState:(modeToSet == MODE_DISCRETE_ONLY ? NSOnState : NSOffState)];
+        [dynamicSwitching setState:(modeToSet == MODE_DYNAMIC ? NSOnState : NSOffState)];
+        NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+        [ud setInteger:modeToSet forKey:@"selected-mode"];
+        GTMLoggerDebug(@"Successfully set mode to %d", modeToSet);
+    } else {
+        GTMLoggerDebug(@"Failed to switch to mode %d", modeToSet);
+    }
+}
+
+
+- (IBAction)setMode:(id)sender
+{
+    if (sender == switchGPUs) {
+        [self setModeInt:MODE_SWITCH];
+    }
+    
+    // Don't go any further if the user clicked on an already-selected item.
+    if ([sender state] == NSOnState) return;
+    
+    if (sender == integratedOnly) {
+        [self setModeInt:MODE_INTEGRATED_ONLY];
+    }
+    if (sender == discreteOnly) {
+        [self setModeInt:MODE_DISCRETE_ONLY];
+    }
+    
+    if (sender == dynamicSwitching) {
+        [self setModeInt:MODE_DYNAMIC];
     }
 }
 
